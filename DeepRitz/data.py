@@ -18,20 +18,17 @@ def generate_offline_dataset(cfg, filename='pde_dataset.pt'):
     # 2. 生成所有 Boundary Points
     m = cfg.model.batch_bd // (2 * dim)
 
-    print(f"生成边界点: {m} 个...")
-    all_xyz_bd = torch.rand(2 * dim * m, dim)
-
+    print(f"生成边界点: {cfg.model.batch_bd} 个...")
     # 每一个 step 有 2*dim 个面，每个面有 m_per_step 个点
-    # 我们可以把 all_xyz_bd 看作 [total_steps, 2*dim, m_per_step, dim]
-    reshaped_bd = all_xyz_bd.view(2 * dim, m, dim)
+    all_xyz_bd = torch.rand(m, 2 * dim, dim)
+    all_xyz_bd = bound[0] + (bound[1] - bound[0]) * all_xyz_bd  # 适应边界条件
+    # all_xyz_bd = all_xyz_bd.view(2 * dim, m, dim)
 
     for i in range(dim):
-        # 第 i 维的上界 (1.0) -> 对应第 i 个面
-        reshaped_bd[i, :, i] = bound[1]
-        # 第 i 维的下界 (-0.0) -> 对应第 i+dim 个面
-        reshaped_bd[i + dim, :, i] = bound[0]
-
-    all_xyz_bd = reshaped_bd.view(-1, dim)
+        # 第 i 维的上界 -> 对应第 i 个面
+        all_xyz_bd[:, i, i] = bound[1]
+        # 第 i 维的下界 -> 对应第 i+dim 个面
+        all_xyz_bd[:, i + dim, i] = bound[0]
 
     # 3. 保存到硬盘 (二进制格式)
     torch.save(
@@ -47,14 +44,14 @@ class DRMDataset(Dataset):
         初始化：加载整个 .pt 文件到 CPU 内存中
         """
         # 加载数据 (map_location='cpu' 确保数据加载到内存而不是显存)
-        data = torch.load(cfg.data.pt_file_path, map_location='cpu')
+        data = torch.load(cfg.data.file_path, map_location='cpu')
 
         self.xyz_in = data['xyz_in']
         self.xyz_bd = data['xyz_bd']
 
         # 从保存的字典中获取配置信息
-        self.batch_in_size = data['batch_in']
-        self.batch_bd_size = data['batch_bd']
+        self.batch_in_size = data['batch_in'] // cfg.data.n_steps
+        self.batch_bd_size = data['batch_bd'] // cfg.data.n_steps
 
         self.dim = data['dim']
 
@@ -73,8 +70,16 @@ class DRMDataset(Dataset):
         batch_xyz_in = self.xyz_in[start_in:end_in]
 
         # 2. 切取边界点 (Boundary Points)
-        start_bd = idx * self.batch_bd_size
-        end_bd = (idx + 1) * self.batch_bd_size
-        batch_xyz_bd = self.xyz_bd[start_bd:end_bd]
+        start_bd = idx * self.batch_bd_size // (2 * self.dim)
+        end_bd = (idx + 1) * self.batch_bd_size // (2 * self.dim)
+        batch_xyz_bd = self.xyz_bd[start_bd:end_bd].view(-1, self.dim)
 
         return batch_xyz_in, batch_xyz_bd
+
+
+def get_dataloader(cfg):
+    if not os.path.exists(cfg.data.file_path):
+        generate_offline_dataset(cfg, filename=cfg.data.file_path)
+    dataset = DRMDataset(cfg)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+    return dataloader

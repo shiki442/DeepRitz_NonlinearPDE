@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 
 import numpy as np
@@ -10,6 +11,7 @@ from DeepRitz.matplot import Result
 from DeepRitz.loss import VarLoss
 from DeepRitz.nn import SolutionNet
 from DeepRitz.problem import EllipticPDE
+from DeepRitz.data import DRMDataset, generate_offline_dataset, get_dataloader
 import DeepRitz.utils as utils
 
 from torch.utils.tensorboard import SummaryWriter
@@ -28,11 +30,9 @@ class Model:
         self.loss_func = VarLoss(self.problem).to(self.device)
         self.optimizer = optim.Adam(params=self.solution_net.parameters(), lr=cfg.training.lr)
 
-        self.writer = SummaryWriter(log_dir="./logs/" + cfg.model.sol_func)
-        self.ckpt_dir = "./checkpoints/" + cfg.model.sol_func
-        os.makedirs(self.ckpt_dir, exist_ok=True)
+        self.writer = SummaryWriter(log_dir=cfg.data.log_dir)
+        self.ckpt_dir = cfg.data.ckpt_dir
         self.verbose = cfg.verbose.train_info
-        self.xyz_plot = None  # 用于绘图的网格点
 
     def _train_step(self, xyz_in, xyz_bd, cfg, epoch):
 
@@ -53,31 +53,24 @@ class Model:
         return self.optimizer.step(closure)
 
     def train(self):
-        torch.manual_seed(1234)
+        torch.manual_seed(134)
         dim = self.cfg.model.dim
         xyz_grid = utils.precompute_grid(dim, 'random', self.cfg.model.sol_func).to(self.device)
         solution_exact = self.problem.u_exact(xyz_grid).to(self.device)
 
-        for epoch in range(self.cfg.training.n_epochs):
+        start_epoch = self.resume_from_latest()
+
+        dataloader = get_dataloader(self.cfg)
+        for epoch in range(start_epoch, self.cfg.training.n_epochs):
             # torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.step_size, gamma=self.gamma)
             # torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.cfg.training.n_epochs, eta_min=1e-7)
-            n = self.cfg.model.batch_in
-            xyz_in = torch.rand(n, dim)
-            if self.cfg.model.sol_func == "func2":
-                xyz_in = xyz_in * 2 - 1
-            xyz_in = xyz_in.to(self.device)
 
-            m = self.cfg.model.batch_bd // (2 * dim)
-            xyz_bd = torch.rand(2 * dim * m, dim)
-            for i in range(dim):
-                # 加入边界点
-                xyz_bd[i * m : (i + 1) * m, i] = 1.0
-                xyz_bd[(i + dim) * m : (i + dim + 1) * m, i] = -0.0
-            xyz_bd = xyz_bd.to(self.device)
-
-            self.solution_net.train(mode=True)
-            loss = self._train_step(xyz_in, xyz_bd, self.cfg, epoch)  # 训练
-            self.solution_net.train(mode=False)
+            for batch_idx, (xyz_in, xyz_bd) in enumerate(dataloader):
+                xyz_in = xyz_in.squeeze(0).to(self.device)
+                xyz_bd = xyz_bd.squeeze(0).to(self.device)
+                self.solution_net.train(mode=True)
+                loss = self._train_step(xyz_in, xyz_bd, self.cfg, epoch)  # 训练
+                self.solution_net.train(mode=False)
             self._train_info(loss, xyz_grid, solution_exact, epoch)
         self.writer.close()
         return loss.item()
@@ -119,3 +112,41 @@ class Model:
     def load_checkpoint(self, epoch):
         ckpt_path = os.path.join(self.ckpt_dir, f"model_epoch_{epoch+1}.pth")
         self.solution_net.load_state_dict(torch.load(ckpt_path, map_location=self.device))
+
+    def resume_from_latest(self):
+        # 1. 如果目录不存在，直接从 0 开始
+        if not os.path.exists(self.ckpt_dir):
+            os.makedirs(self.ckpt_dir, exist_ok=True)
+            print(f"Checkpoint 目录不存在，已创建: {self.ckpt_dir}。从头开始训练。")
+            return 0
+
+        # 2. 获取目录下所有文件
+        files = os.listdir(self.ckpt_dir)
+
+        # 3. 筛选并提取 epoch 数字
+        # 正则表达式匹配 model_epoch_{数字}.pth
+        pattern = re.compile(r"model_epoch_(\d+).pth")
+        epochs = []
+
+        for f in files:
+            match = pattern.match(f)
+            if match:
+                # 获取文件名中的数字 (e.g., model_epoch_10.pth -> 10)
+                epochs.append(int(match.group(1)))
+
+        # 4. 如果没有找到相关文件，从 0 开始
+        if not epochs:
+            print("未找到任何断点，从头开始训练。")
+            return 0
+
+        # 5. 找到最新的 epoch
+        latest_epoch_num = max(epochs)
+
+        # 6. 加载断点
+        print(f"检测到最新断点: model_epoch_{latest_epoch_num}.pth，正在加载...")
+        self.load_checkpoint(latest_epoch_num - 1)
+
+        print(f"成功恢复! 将从 epoch {latest_epoch_num} 开始继续训练。")
+
+        # 返回最新的 epoch 数字作为新的开始索引
+        return latest_epoch_num

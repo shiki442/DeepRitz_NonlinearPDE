@@ -8,6 +8,7 @@ from DeepRitz.problem import EllipticPDE
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
+
 def precompute_grid(dim, grid_type='diagonal', nonli_func='func1'):
     # calculate the exact solution, create grid
     n = 100
@@ -39,7 +40,7 @@ def precompute_grid(dim, grid_type='diagonal', nonli_func='func1'):
     return xyz_grid
 
 
-def plot_pde_results(pde:EllipticPDE, net:torch.nn.Module, writer=None, epoch=None):
+def plot_pde_results(pde: EllipticPDE, net: torch.nn.Module, writer=None, epoch=None):
     # ---------------------------------------------------------
     # 定义网格范围
     x = np.linspace(0, 1, 100)
@@ -50,7 +51,7 @@ def plot_pde_results(pde:EllipticPDE, net:torch.nn.Module, writer=None, epoch=No
     if pde.dim >= 2:
         xyz_plot = F.pad(xyz_plot, (0, pde.dim - 2), "constant", 0.5)
 
-    net.eval() 
+    net.eval()
     with torch.no_grad():
         u_nn = net(xyz_plot)
     u_nn = u_nn.reshape(X.shape).detach().cpu().numpy()
@@ -69,7 +70,7 @@ def plot_pde_results(pde:EllipticPDE, net:torch.nn.Module, writer=None, epoch=No
     axes[0].set_title('Exact Solution ($u_{exact}$)', fontsize=15)
     axes[0].set_xlabel('$x$')
     axes[0].set_ylabel('$y$')
-    axes[0].set_aspect('equal') # 保持x和y轴比例一致
+    axes[0].set_aspect('equal')  # 保持x和y轴比例一致
     cbar1 = fig.colorbar(im1, ax=axes[0])
     cbar1.ax.set_ylabel('u value')
 

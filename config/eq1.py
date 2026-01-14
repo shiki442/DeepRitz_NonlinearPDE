@@ -7,7 +7,7 @@ def get_config():
 
     cfg.model = ConfigDict()
     cfg.model.dim = 2
-    cfg.model.batch_in = 1000000
+    cfg.model.batch_in = 500000
     cfg.model.batch_bd = 200000
     cfg.model.nonli_func = 'Sigmoid'
     cfg.model.sol_func = 'func1'  # 'func1' or 'func2'
@@ -17,7 +17,6 @@ def get_config():
     cfg.training = ConfigDict()
     cfg.training.n_epochs = 100000
     cfg.training.lr = 0.002
-    # cfg.training.step_size = 50000
     cfg.training.gamma = 0.9
 
     cfg.net = ConfigDict()
@@ -26,13 +25,15 @@ def get_config():
 
     cfg.verbose = ConfigDict()
     cfg.verbose.train_info = True
-    cfg.verbose.print_interval = 10
+    cfg.verbose.print_interval = 1
     cfg.verbose.plot_interval = 100
-    cfg.verbose.ckpt_interval = 1000
+    cfg.verbose.ckpt_interval = 100
 
     cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     cfg.data = ConfigDict()
-    cfg.data.pt_file_path = './data/eq1_data.pt'
-    cfg.data.n_steps = 5
+    cfg.data.file_path = f'./data/eq1_{cfg.model.batch_in}_{cfg.model.batch_bd}.pt'
+    cfg.data.ckpt_dir = './checkpoints/eq1/'
+    cfg.data.log_dir = './logs/eq1/'
+    cfg.data.n_steps = 10
     return cfg

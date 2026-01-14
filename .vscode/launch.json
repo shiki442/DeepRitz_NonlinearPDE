@@ -11,7 +11,7 @@
             "request": "launch",
             "program": "./main.py",
             "console": "integratedTerminal",
-            "args": "./config/eq1.py"
+            // "args": "./config/eq1.py"
         }
     ]
 }

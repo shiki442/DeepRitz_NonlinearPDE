@@ -12,10 +12,8 @@ class VarLoss(nn.Module):
         self.h = problem.h
         self.boundary_indicator = problem.boundary_indicator
         self.u_exact = problem.u_exact
-        # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def _loss_var_int(self, xyz_in, xyz_bd, u_in, u_grad, u_bd, cfg) -> torch.Tensor:
-        d = xyz_in.shape[1]
         # u_squ = torch.square(u_in)
         u_grad_squ = 0.5 * torch.mean(torch.sum(torch.square(u_grad), dim=1))
         # grad_squ = 0.5 * torch.mean(u_grad_squ)
@@ -23,10 +21,10 @@ class VarLoss(nn.Module):
         gu = torch.mean(torch.mul(g, u_in))
         SigmoidU = torch.sigmoid(u_in)
         Fu = torch.mean(u_in - torch.log(SigmoidU))
-        loss_in = u_grad_squ + Fu - gu 
+        loss_in = u_grad_squ + Fu - gu
 
         h = self.h(xyz_bd).to(cfg.device).view(-1, 1)
-        loss_bd = torch.mean(torch.square(u_bd-h.view(-1, 1)))
+        loss_bd = torch.mean(torch.square(u_bd - h.view(-1, 1)))
         loss = loss_in + cfg.model.lambda_1 * loss_bd
 
         return loss, loss_in, loss_bd
