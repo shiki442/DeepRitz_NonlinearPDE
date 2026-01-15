@@ -8,26 +8,32 @@ from torch.func import functional_call, vmap, jacrev, hessian
 
 
 class EllipticPDE:
-    def __init__(self, sol='func1', nonli='Sigmoid', dim=2):
+    def __init__(self, sol='func1', nonli='Sigmoid', dim=2, beta=None, bound=(0.0, 1.0)):
         self.sol = sol
         self.nonli = nonli
+        self.bound = bound
         self.bound_cond = 'Dirichlet'
         self.dim = dim
+        self.beta = beta
 
     def u_exact(self, xyz: torch.Tensor) -> torch.Tensor:
         dim = self.dim
         if self.sol == "func1":
             # u(x) = Π4xi(1-xi)
             ui = 4 * torch.mul(xyz, 1 - xyz)
-            u_exact = torch.prod(ui, dim=1)
+            u_exact = torch.prod(ui, dim=1, keepdim=True)
         elif self.sol == "func2":
             # u_raw = \bar{x}^2
-            u_raw = torch.square(torch.mean(xyz, dim=1))
+            u_raw = torch.square(torch.mean(xyz, dim=1, keepdim=True))
             mask_flat = u_raw < 0.3
             mask_quad = u_raw >= 0.3
             u = torch.zeros_like(u_raw)
             u[mask_quad] = u_raw[mask_quad]
             u[mask_flat] = 0.3
+        elif self.sol == "Liouville":
+            # u(x,y) = -2log(1+r^2), r = sqrt(x^2 + y^2)
+            r2 = torch.sum(torch.square(xyz), dim=1, keepdim=True)
+            u_exact = 0.25 * self.beta[0] * torch.log(1.0 + r2)
         return u_exact
 
     def h(self, xyz: torch.Tensor) -> torch.Tensor:
@@ -38,12 +44,38 @@ class EllipticPDE:
         if self.nonli == "Sigmoid":
             u = self.u_exact(xyz)
             V = torch.sigmoid(u)
-            return V
+        elif self.nonli == "Sin":
+            u = self.u_exact(xyz)
+            V = torch.sin(u)
+        elif self.nonli == "Exp":
+            u = self.u_exact(xyz)
+            V = self.beta[0] * torch.exp(u)
+        else:
+            V = torch.zeros_like(u)
+        return V
 
     def V(self, u: torch.Tensor) -> torch.Tensor:
         if self.nonli == "Sigmoid":
             Vu = torch.sigmoid(u)
-            return Vu
+        elif self.nonli == "Sin":
+            Vu = torch.sin(u)
+        elif self.nonli == "Exp":
+            Vu = self.beta[0] * torch.exp(u)
+        else:
+            Vu = torch.zeros_like(u)
+        return Vu
+
+    def Fu(self, u: torch.Tensor) -> torch.Tensor:
+        if self.nonli == "Sigmoid":
+            SigmoidU = torch.sigmoid(u)
+            Fu = u - torch.log(SigmoidU)
+        elif self.nonli == "Sin":
+            Fu = -torch.cos(u)
+        elif self.nonli == "Exp":
+            Fu = self.beta[0] * torch.exp(u)
+        else:
+            Fu = torch.zeros_like(u)
+        return Fu
 
     def D2u_ex(self, xyz: torch.Tensor) -> torch.Tensor:
         dim = self.dim
@@ -57,16 +89,20 @@ class EllipticPDE:
                 for j in range(dim):
                     if j != i:
                         D2u[:, i] *= ui[:, j]
-            return -8 * torch.sum(D2u, dim=1)
+            return -8 * torch.sum(D2u, dim=1, keepdim=True)
         elif self.sol == "func2":
-            u_raw = torch.square(torch.mean(xyz, dim=1))
-            laplace_term = torch.zeros_like(u_raw)
-            laplace_term[u_raw >= 0.3] = 2.0 / dim  # 仅在二次区域有值
-        return D2u
+            u_raw = torch.square(torch.mean(xyz, dim=1, keepdim=True))
+            D2u = torch.zeros_like(u_raw)
+            D2u[u_raw >= 0.3] = 2.0 / dim  # 仅在二次区域有值
+            return D2u
+        elif self.sol == "Liouville":
+            r2 = torch.sum(torch.square(xyz), dim=1, keepdim=True)
+            D2u = self.beta[0] / ((r2 + 1.0) ** 2)
+            return D2u
 
     def g(self, xyz: torch.Tensor) -> torch.Tensor:
         g = -self.D2u_ex(xyz) + self.V_ex(xyz)
-        return g.view(-1, 1)
+        return g
 
     def res(self, u_nn, xyz: torch.Tensor) -> torch.Tensor:
         dim = self.dim
@@ -79,7 +115,8 @@ class EllipticPDE:
             u_i = u_grad[:, i]
             u_ii = torch.autograd.grad(u_i, xyz, grad_outputs=torch.ones_like(u_i), create_graph=True, retain_graph=True)[0][:, i]
             u_laplace += u_ii.view(-1, 1)
-        res = -u_laplace + self.V(u) - self.g(xyz)
+        # res = -u_laplace + self.V(u) - self.g(xyz)
+        res = -u_laplace + self.V_ex(xyz) - self.g(xyz)
         return res.detach()
 
     @staticmethod

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch import autograd
+from torch.func import vmap, grad, jacrev
 
 
 def gradient(outputs, inputs):
@@ -8,10 +9,14 @@ def gradient(outputs, inputs):
     return grad[0]
 
 
-def relu_pow(inputs, pow_deg=1.5):
-    # return torch.pow(torch.relu(inputs), pow_deg)
-    f = nn.ReLU6()
-    return torch.pow(f(inputs), pow_deg)
+def act(inputs):
+    # return nn.SELU()(inputs)
+    # return nn.SiLU()(inputs)
+    # return nn.ReLU()(inputs)
+    # return nn.ReLU6()(inputs)
+    # return nn.Tanh()(inputs)
+    # return torch.pow(nn.ReLU6()(inputs), 2.0)
+    return torch.pow(nn.ReLU6()(inputs), 1.5)
 
 
 @torch.no_grad()
@@ -30,9 +35,9 @@ class Block(nn.Module):
 
     def forward(self, x) -> torch.Tensor:
         residual = self.dense1(x)
-        residual = relu_pow(residual)
+        residual = act(residual)
         residual = self.dense2(residual)
-        residual = relu_pow(residual)
+        residual = act(residual)
         x = torch.add(x, residual)
         return x
 
@@ -53,7 +58,7 @@ class SolutionNet(nn.Module):
 
     def forward(self, x) -> torch.Tensor:
         n_modules = len(self.module_list)
-        x = relu_pow(self.module_list[0](x))
+        x = act(self.module_list[0](x))
         for idx in range(1, n_modules - 1):
             x = self.module_list[idx](x)
         x = self.module_list[-1](x)
@@ -63,3 +68,14 @@ class SolutionNet(nn.Module):
         xy_clone = xy.clone().detach().requires_grad_(True)
         u = self.forward(xy_clone)
         return gradient(u, xy_clone)
+
+    def grad_u_single(self, xy):
+        # 使用 functional_call 调用模型
+        params = dict(self.named_parameters())
+        # u = torch.func.functional_call(self, params, (xy,))
+        # 计算导数
+        du_dx = jacrev(lambda x: torch.func.functional_call(self, params, (x,)))(xy)
+        return du_dx
+
+    def grad_u_func(self, xy) -> torch.Tensor:
+        return vmap(self.grad_u_single)(xy)

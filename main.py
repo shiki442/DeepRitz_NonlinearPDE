@@ -16,9 +16,3 @@ net.to(cfg.device)
 # ----------------------------------------trianing----------------------------------------
 model = Model(cfg, net)
 model.train()
-
-# ----------------------------------------Visualization----------------------------------------
-# result = Result(dim, type_c, sysinfo, grid_type='diagonal')
-# result.plot_unn_heatmap()
-# result.plot_unn()
-# result.plot_result()

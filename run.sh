@@ -21,7 +21,7 @@ echo ---------------------------------------------
 
 source /project/songpengcheng/miniconda3/etc/profile.d/conda.sh
 conda activate torch
-/project/songpengcheng/miniconda3/envs/torch/bin/python -u main.py ./config/eq1.py
+/project/songpengcheng/miniconda3/envs/torch/bin/python -u main_pl.py
 
 echo ---------------------------------------------
 echo End at `date`
