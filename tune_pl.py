@@ -6,8 +6,8 @@ import torch
 
 # 引入你现有的模块
 from config.eq3 import get_config 
-from DeepRitz.data import DeepRitzDataModule
-from DeepRitz.model import DeepRitzSystem
+from DeepRitz.data_pl import DeepRitzDataModule
+from DeepRitz.model_pl import DeepRitzSystem
 
 def objective(trial: optuna.trial.Trial):
     # 1. 获取基础配置
@@ -23,7 +23,8 @@ def objective(trial: optuna.trial.Trial):
     # 网络架构
     cfg.net.width = trial.suggest_int("width", 10, 50, step=5)
     cfg.net.depth = trial.suggest_int("depth", 2, 6)
-    
+    cfg.net.act = trial.suggest_categorical("activation", ["Tanh", "ReLU6p"])
+
     # 惩罚项系数 (lambda_1): DeepRitz 中边界惩罚非常关键
     if hasattr(cfg.model, 'lambda_1'):
         cfg.model.lambda_1 = trial.suggest_float("lambda_1", 100, 5000, log=True)

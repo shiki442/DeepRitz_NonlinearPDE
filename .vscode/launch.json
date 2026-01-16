@@ -9,9 +9,17 @@
             "name": "DRM",
             "type": "debugpy",
             "request": "launch",
-            "program": "./main.py",
+            "program": "./main_pl.py",
             "console": "integratedTerminal",
             // "args": "./config/eq1.py"
-        }
+        },
+        {
+            "name": "tune",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./tune_pl.py",
+            "console": "integratedTerminal",
+            // "args": "./config/eq1.py"
+        }      
     ]
 }

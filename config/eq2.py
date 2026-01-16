@@ -9,7 +9,7 @@ def get_config():
     cfg.model.dim = 2
     cfg.model.batch_in = 500000
     cfg.model.batch_bd = 200000
-    cfg.model.nonli_func = 'Sigmoid'
+    cfg.model.nonli_func = 'Sin'
     cfg.model.sol_func = 'func1'  # 'func1' or 'func2'
     cfg.model.lambda_1 = 2000
     cfg.model.bound = [0.0, 1.0]
@@ -22,7 +22,6 @@ def get_config():
     cfg.net = ConfigDict()
     cfg.net.depth = 2
     cfg.net.width = 120
-    cfg.net.act = 'ReLU6p'  # 'ReLU6p' or 'SiLU' or 'ReLU' etc.
 
     cfg.verbose = ConfigDict()
     cfg.verbose.train_info = True
@@ -33,8 +32,8 @@ def get_config():
     cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     cfg.data = ConfigDict()
-    cfg.data.file_path = f'./data/eq1_{cfg.model.batch_in}_{cfg.model.batch_bd}.pt'
-    cfg.data.ckpt_dir = './checkpoints/eq1/'
-    cfg.data.log_dir = './logs/eq1/'
+    cfg.data.file_path = f'./data/eq2_{cfg.model.batch_in}_{cfg.model.batch_bd}.pt'
+    cfg.data.ckpt_dir = './checkpoints/eq2/'
+    cfg.data.log_dir = './logs/eq2/'
     cfg.data.n_steps = 10
     return cfg

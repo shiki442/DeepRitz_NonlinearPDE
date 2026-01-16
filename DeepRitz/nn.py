@@ -9,14 +9,19 @@ def gradient(outputs, inputs):
     return grad[0]
 
 
-def act(inputs):
-    # return nn.SELU()(inputs)
-    # return nn.SiLU()(inputs)
-    # return nn.ReLU()(inputs)
-    # return nn.ReLU6()(inputs)
-    # return nn.Tanh()(inputs)
-    # return torch.pow(nn.ReLU6()(inputs), 2.0)
-    return torch.pow(nn.ReLU6()(inputs), 1.5)
+def get_act(act_name):
+    if act_name == 'ReLU6p':
+        def activation(inputs):
+            return torch.pow(nn.ReLU6()(inputs), 1.5)
+        return activation
+    elif act_name == 'ReLU':
+        return nn.ReLU()
+    elif act_name == 'SiLU':
+        return nn.SiLU()
+    elif act_name == 'Tanh':
+        return nn.Tanh()
+    else:
+        raise ValueError(f"Unsupported activation function: {act_name}")
 
 
 @torch.no_grad()
@@ -28,37 +33,39 @@ def _init_params(m):
 
 
 class Block(nn.Module):
-    def __init__(self, n_features, width):
+    def __init__(self, n_features, width, act):
         super(Block, self).__init__()
         self.dense1 = nn.Linear(in_features=n_features, out_features=width)
         self.dense2 = nn.Linear(in_features=width, out_features=n_features)
+        self.act = get_act(act)
 
     def forward(self, x) -> torch.Tensor:
         residual = self.dense1(x)
-        residual = act(residual)
+        residual = self.act(residual)
         residual = self.dense2(residual)
-        residual = act(residual)
+        residual = self.act(residual)
         x = torch.add(x, residual)
         return x
 
 
 class SolutionNet(nn.Module):
-    def __init__(self, in_features, out_features, block_width, n_blocks):
+    def __init__(self, in_features, out_features, block_width, n_blocks, act='ReLU6p'):
         super(SolutionNet, self).__init__()
         self.module_list = nn.ModuleList()
         # append input layer
         self.module_list.append(nn.Linear(in_features=in_features, out_features=block_width))
         # append blocks
         for _ in range(n_blocks):
-            self.module_list.append(Block(n_features=block_width, width=block_width))
+            self.module_list.append(Block(n_features=block_width, width=block_width, act=act))
         # append output layer
         self.module_list.append(nn.Linear(in_features=block_width, out_features=out_features))
         # initialize parameters
         self.apply(_init_params)
+        self.act = get_act(act)
 
     def forward(self, x) -> torch.Tensor:
         n_modules = len(self.module_list)
-        x = act(self.module_list[0](x))
+        x = self.act(self.module_list[0](x))
         for idx in range(1, n_modules - 1):
             x = self.module_list[idx](x)
         x = self.module_list[-1](x)
