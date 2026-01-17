@@ -6,14 +6,14 @@ def get_config():
     cfg = ConfigDict()
 
     cfg.model = ConfigDict()
-    cfg.model.dim = 2
+    cfg.model.dim = 5
     cfg.model.batch_in = 500000
-    cfg.model.batch_bd = 200000
-    cfg.model.nonli_func = 'Exp'
-    cfg.model.sol_func = 'Liouville'
+    cfg.model.batch_bd = 500000
+    cfg.model.nonli_func = 'Poly'
+    cfg.model.sol_func = 'Yamabe'
     cfg.model.lambda_1 = 2000.0
     cfg.model.bound = [-0.0, 1.0]
-    cfg.model.beta = [-8.0]
+    cfg.model.beta = [-1.0, 7.0 / 3.0]  # beta[1]=(d+2)/(d-2)
 
     cfg.training = ConfigDict()
     cfg.training.n_epochs = 5000
@@ -35,9 +35,9 @@ def get_config():
     cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     cfg.data = ConfigDict()
-    cfg.data.file_path = f'./data/eq3_{cfg.model.batch_in}_{cfg.model.batch_bd}.pt'
-    cfg.data.ckpt_dir = './checkpoints/eq3/'
-    cfg.data.log_dir = './logs/eq3/'
+    cfg.data.file_path = f'./data/eq4_{cfg.model.batch_in}_{cfg.model.batch_bd}.pt'
+    cfg.data.ckpt_dir = './checkpoints/eq4/'
+    cfg.data.log_dir = './logs/eq4/'
     cfg.data.n_steps = 10
     cfg.data.padding = 0.5
     return cfg

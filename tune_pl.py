@@ -5,7 +5,7 @@ import os
 import torch
 
 # 引入你现有的模块
-from config.eq3 import get_config 
+from config.eq2 import get_config 
 from DeepRitz.data_pl import DeepRitzDataModule
 from DeepRitz.model_pl import DeepRitzSystem
 
@@ -21,14 +21,16 @@ def objective(trial: optuna.trial.Trial):
     cfg.training.lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
     
     # 网络架构
-    cfg.net.width = trial.suggest_int("width", 10, 50, step=5)
+    cfg.net.width = trial.suggest_int("width", 30, 150, step=10)
     cfg.net.depth = trial.suggest_int("depth", 2, 6)
     cfg.net.act = trial.suggest_categorical("activation", ["Tanh", "ReLU6p"])
 
     # 惩罚项系数 (lambda_1): DeepRitz 中边界惩罚非常关键
     if hasattr(cfg.model, 'lambda_1'):
-        cfg.model.lambda_1 = trial.suggest_float("lambda_1", 100, 5000, log=True)
+        cfg.model.lambda_1 = trial.suggest_float("lambda_1", 500, 5000, log=True)
 
+    if hasattr(cfg.training, 'patience'):
+        cfg.training.patience = trial.suggest_categorical("patience", [50, 1000])
     # 注意：不要在调参中修改 batch_size 或 data 相关参数，
     # 因为你的 data.py 会生成固定文件名的 .pt 文件，修改这些参数需要重新生成数据。
 
@@ -60,7 +62,7 @@ def objective(trial: optuna.trial.Trial):
         logger=logger,
         enable_checkpointing=False, # 搜索时不保存大量权重文件
         callbacks=[pruning_callback],
-        enable_progress_bar=True,  # 关闭进度条以减少控制台输出
+        enable_progress_bar=False,  # 关闭进度条以减少控制台输出
         log_every_n_steps=10
     )
 
@@ -88,7 +90,7 @@ def objective(trial: optuna.trial.Trial):
 if __name__ == "__main__":
     # 创建 Study 对象
     study = optuna.create_study(
-        study_name="deepritz_study",         # 给任务起个名
+        study_name="deepritz_eq2",         # 给任务起个名
         storage="sqlite:///db.sqlite3",      # 必须指定 storage
         load_if_exists=True,                 # 支持断点续传
         direction="minimize",                # 最小化 error

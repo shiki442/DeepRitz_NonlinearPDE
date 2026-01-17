@@ -14,6 +14,10 @@ def get_act(act_name):
         def activation(inputs):
             return torch.pow(nn.ReLU6()(inputs), 1.5)
         return activation
+    elif act_name == 'ReLUsq':
+        def activation(inputs):
+            return torch.square(nn.ReLU()(inputs))
+        return activation
     elif act_name == 'ReLU':
         return nn.ReLU()
     elif act_name == 'SiLU':

@@ -7,7 +7,7 @@ from DeepRitz.nn import SolutionNet
 from DeepRitz.problem import EllipticPDE
 from DeepRitz.loss import VarLoss
 
-torch.serialization.add_safe_globals([ml_collections.config_dict.config_dict.ConfigDict])
+# torch.serialization.add_safe_globals([ml_collections.config_dict.config_dict.ConfigDict])
 
 class DeepRitzSystem(pl.LightningModule):
     def __init__(self, cfg):
@@ -33,7 +33,7 @@ class DeepRitzSystem(pl.LightningModule):
         self.loss_func = VarLoss(self.problem)
         
         # 预计算用于评估的网格 (注册为 buffer 以便自动移动到 device)
-        xyz_grid = utils.precompute_grid(dim, 'grid', bound=cfg.model.bound)
+        xyz_grid = utils.precompute_grid(dim, 'grid', bound=cfg.model.bound, padding=cfg.data.padding)
         self.register_buffer('xyz_grid', xyz_grid)
 
     def forward(self, x):
@@ -41,8 +41,14 @@ class DeepRitzSystem(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.cfg.training.lr)
-        # 如果需要 Scheduler，可以在这里返回 [optimizer], [scheduler]
-        return optimizer
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=self.cfg.training.patience, factor=self.cfg.training.gamma, min_lr=1e-6)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "monitor": "val_error",
+            },
+    }
 
     def training_step(self, batch, batch_idx):
         # batch 是从 DataLoader 出来的，维度通常是 [1, N, dim]
@@ -66,9 +72,9 @@ class DeepRitzSystem(pl.LightningModule):
         loss, loss_in, loss_bd = self.loss_func(xyz_in, xyz_bd, u_in, u_grad, u_bd, self.cfg)
 
         # 记录日志 (显示在进度条和 TensorBoard)
-        self.log('train_loss', loss, prog_bar=True)
-        self.log('loss_in', loss_in)
-        self.log('loss_bd', loss_bd)
+        self.log('loss/total', loss, prog_bar=True)
+        self.log('loss/in', loss_in)
+        self.log('loss/bd', loss_bd)
 
         return loss
 
@@ -93,7 +99,7 @@ class DeepRitzSystem(pl.LightningModule):
 
         # 记录 Metric
         self.log('val_error', err, prog_bar=True)
-        self.log('val_residual', res)
+        self.log('loss/residual', res)
 
         # 2. 打印信息 (Lightning 的进度条已经包含 Loss 和 Error，这里可选择性打印)
         # if (epoch + 1) % self.cfg.verbose.print_interval == 0:
@@ -103,7 +109,7 @@ class DeepRitzSystem(pl.LightningModule):
         if (epoch + 1) % self.cfg.verbose.plot_interval == 0 or epoch == 0:
             # 只有当 Logger 是 TensorBoardLogger 时才绘图
             if hasattr(self.logger, 'experiment'):
-                utils.plot_pde_results(self.problem, self.solution_net, self.logger.experiment, epoch)
+                utils.plot_pde_results(self.problem, self.solution_net, self.logger.experiment, epoch, padding=self.cfg.data.padding)
 
     def _relative_err(self, u_nn, u_exact, ord=2):
         diff_norm = torch.linalg.norm(u_nn - u_exact, ord=ord)

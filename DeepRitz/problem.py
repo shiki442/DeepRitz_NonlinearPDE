@@ -8,7 +8,7 @@ from torch.func import functional_call, vmap, jacrev, hessian
 
 
 class EllipticPDE:
-    def __init__(self, sol='func1', nonli='Sigmoid', dim=2, beta=None, bound=(0.0, 1.0)):
+    def __init__(self, sol='onepeak', nonli='Sigmoid', dim=2, beta=None, bound=(0.0, 1.0)):
         self.sol = sol
         self.nonli = nonli
         self.bound = bound
@@ -18,68 +18,91 @@ class EllipticPDE:
 
     def u_exact(self, xyz: torch.Tensor) -> torch.Tensor:
         dim = self.dim
-        if self.sol == "func1":
+        if self.sol.lower() == "onepeak":
             # u(x) = Π4xi(1-xi)
             ui = 4 * torch.mul(xyz, 1 - xyz)
             u_exact = torch.prod(ui, dim=1, keepdim=True)
-        elif self.sol == "func2":
-            # u_raw = \bar{x}^2
-            u_raw = torch.square(torch.mean(xyz, dim=1, keepdim=True))
-            mask_flat = u_raw < 0.3
-            mask_quad = u_raw >= 0.3
-            u = torch.zeros_like(u_raw)
-            u[mask_quad] = u_raw[mask_quad]
-            u[mask_flat] = 0.3
-        elif self.sol == "Liouville":
+        elif self.sol.lower() == "twopeak":
+            # u(x) = sin(pi*x1)+Π4xi(1-xi) %(2-d)
+            u_2tod = 4 * torch.mul(xyz[:, 1:], 1 - xyz[:, 1:])
+            u_exact = torch.sin(2 * math.pi * xyz[:, 0:1]) * torch.prod(u_2tod, dim=1, keepdim=True)
+        elif self.sol.lower() == "nondiff":
+            # # u_raw = \bar{x}^2
+            # u_raw = torch.square(torch.mean(xyz, dim=1, keepdim=True))
+            # mask_flat = u_raw < 1.0 / 6.0
+            # mask_quad = u_raw >= 1.0 / 6.0
+            # u_exact = torch.zeros_like(u_raw)
+            # u_exact[mask_quad] = u_raw[mask_quad]
+            # u_exact[mask_flat] = 1.0 / 6.0
+
+            u_exact = 0.5 - torch.sum(torch.square(xyz), dim=1, keepdim=True)
+            mask_flat = u_exact > 1./3
+            u_exact[mask_flat] = 1./3
+        elif self.sol.lower() == "liouville":
             # u(x,y) = -2log(1+r^2), r = sqrt(x^2 + y^2)
             r2 = torch.sum(torch.square(xyz), dim=1, keepdim=True)
             u_exact = 0.25 * self.beta[0] * torch.log(1.0 + r2)
+        elif self.sol.lower() == "yamabe":
+            # lambda=1, x_0=0.3
+            x0 = 0.3
+            r2 = torch.sum(torch.square(xyz - x0), dim=1, keepdim=True)
+            k = (dim * (dim - 2)) ** 0.5
+            u_exact = (k / (1 + r2)) ** (dim / 2.0 - 1.0)
         return u_exact
 
     def h(self, xyz: torch.Tensor) -> torch.Tensor:
-        if self.bound_cond == 'Dirichlet':
+        if self.bound_cond.lower() == 'dirichlet':
             return self.u_exact(xyz)
 
     def V_ex(self, xyz: torch.Tensor) -> torch.Tensor:
-        if self.nonli == "Sigmoid":
+        if self.nonli.lower() == "sigmoid":
             u = self.u_exact(xyz)
             V = torch.sigmoid(u)
-        elif self.nonli == "Sin":
+        elif self.nonli.lower() == "sin":
             u = self.u_exact(xyz)
-            V = torch.sin(u)
-        elif self.nonli == "Exp":
+            V = self.beta[0] * torch.sin(self.beta[1] * u)
+        elif self.nonli.lower() == "exp":
             u = self.u_exact(xyz)
             V = self.beta[0] * torch.exp(u)
+        elif self.nonli.lower() == "poly":
+            u = self.u_exact(xyz)
+            V = self.beta[0] * torch.pow(u, self.beta[1])
         else:
             V = torch.zeros_like(u)
         return V
 
     def V(self, u: torch.Tensor) -> torch.Tensor:
-        if self.nonli == "Sigmoid":
+        if self.nonli.lower() == "sigmoid":
             Vu = torch.sigmoid(u)
-        elif self.nonli == "Sin":
-            Vu = torch.sin(u)
-        elif self.nonli == "Exp":
+        elif self.nonli.lower() == "sin":
+            Vu = self.beta[0] * torch.sin(self.beta[1] * u)
+        elif self.nonli.lower() == "exp":
             Vu = self.beta[0] * torch.exp(u)
+        elif self.nonli.lower() == "poly":
+            Vu = self.beta[0] * torch.pow(u, self.beta[1])
         else:
             Vu = torch.zeros_like(u)
         return Vu
 
     def Fu(self, u: torch.Tensor) -> torch.Tensor:
-        if self.nonli == "Sigmoid":
+        if self.nonli.lower() == "sigmoid":
             SigmoidU = torch.sigmoid(u)
             Fu = u - torch.log(SigmoidU)
-        elif self.nonli == "Sin":
-            Fu = -torch.cos(u)
-        elif self.nonli == "Exp":
+        elif self.nonli.lower() == "sin":
+            Fu = -self.beta[0] / self.beta[1] * torch.cos(u)
+        elif self.nonli.lower() == "exp":
             Fu = self.beta[0] * torch.exp(u)
+        elif self.nonli.lower() == "poly":
+            u = torch.abs(u)
+            # s = torch.sgn(u)
+            Fu = (self.beta[0] / (self.beta[1] + 1)) * torch.pow(u, self.beta[1] + 1)
         else:
             Fu = torch.zeros_like(u)
         return Fu
 
     def D2u_ex(self, xyz: torch.Tensor) -> torch.Tensor:
         dim = self.dim
-        if self.sol == "func1":
+        if self.sol.lower() == "onepeak":
             # u设为\prod 4xi(1-xi)
             # D2u[:, i]储存u对xi的二阶导
             D2u = torch.ones_like(xyz)
@@ -90,14 +113,31 @@ class EllipticPDE:
                     if j != i:
                         D2u[:, i] *= ui[:, j]
             return -8 * torch.sum(D2u, dim=1, keepdim=True)
-        elif self.sol == "func2":
-            u_raw = torch.square(torch.mean(xyz, dim=1, keepdim=True))
-            D2u = torch.zeros_like(u_raw)
-            D2u[u_raw >= 0.3] = 2.0 / dim  # 仅在二次区域有值
+        elif self.sol.lower() == "twopeak":
+            D2u = torch.ones_like(xyz)
+            u_2tod = 4 * torch.mul(xyz[:, 1:], 1 - xyz[:, 1:])
+            for i in range(1, dim):
+                for j in range(1, dim):
+                    if j != i:
+                        D2u[:, i] *= u_2tod[:, j - 1]
+            laplace_2tod = -8 * torch.sum(D2u[:, 1:], dim=1, keepdim=True)
+            laplace_x1 = -4 * math.pi**2 * torch.sin(2 * math.pi * xyz[:, 0:1]) * torch.prod(u_2tod, dim=1, keepdim=True)
+            return laplace_x1 + laplace_2tod
+        elif self.sol.lower() == "nondiff":
+            u_raw = 0.5 - torch.square(torch.mean(xyz, dim=1, keepdim=True))
+            # D2u = torch.zeros_like(u_raw)
+            # D2u[u_raw >= 1.0 / 6.0] = 2.0 / dim  # 仅在二次区域有值
+            D2u = -2.0 * torch.ones_like(u_raw) * dim
+            D2u[u_raw > 1./3] = 0.0
             return D2u
-        elif self.sol == "Liouville":
+        elif self.sol.lower() == "liouville":
             r2 = torch.sum(torch.square(xyz), dim=1, keepdim=True)
             D2u = self.beta[0] / ((r2 + 1.0) ** 2)
+            return D2u
+        elif self.sol.lower() == "yamabe":
+            r2 = torch.sum(torch.square(xyz), dim=1, keepdim=True)
+            k = (dim * (dim - 2)) ** 0.5
+            D2u = -((k / (1 + r2)) ** (dim / 2.0 - 1.0))
             return D2u
 
     def g(self, xyz: torch.Tensor) -> torch.Tensor:

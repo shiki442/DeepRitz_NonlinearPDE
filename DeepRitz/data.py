@@ -81,5 +81,5 @@ def get_dataloader(cfg):
     if not os.path.exists(cfg.data.file_path):
         generate_offline_dataset(cfg, filename=cfg.data.file_path)
     dataset = DRMDataset(cfg)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4, persistent_workers=True)
     return dataloader

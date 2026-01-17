@@ -36,27 +36,19 @@ def get_latest_checkpoint(ckpt_dir):
     return latest_ckpt
 
 
-def precompute_grid(dim, grid_type='diagonal', bound=(0.0, 1.0)):
+def precompute_grid(dim, grid_type='diagonal', bound=(0.0, 1.0), padding=0.5):
     # calculate the exact solution, create grid
     n = 100
     grid = torch.linspace(bound[0], bound[1], n + 1)
 
     if grid_type == 'grid':
-        d_grid = torch.meshgrid([grid for i in range(dim)])
-        xyz_grid = torch.empty([(n + 1) ** dim, dim])
-        for i in range(dim):
-            a = d_grid[i].reshape(-1, 1)
-            for j in range((n + 1) ** dim):
-                xyz_grid[j, i] = a[j, 0]
-    elif grid_type == 'x-axis':
-        xyz_grid = 0.5 * torch.ones(n + 1, dim)
-        for j in range(n + 1):
-            xyz_grid[j, 0] = grid[j]
+        active_dims = min(dim, 2)
+        d_grid = torch.meshgrid([grid for _ in range(active_dims)], indexing='ij')
+        xyz_grid = torch.stack([g.reshape(-1) for g in d_grid], dim=1)
+        if dim>2:
+            xyz_grid = F.pad(xyz_grid, (0, dim-2), "constant", padding)
     elif grid_type == 'diagonal':
-        xyz_grid = torch.zeros(n + 1, dim)
-        for j in range(n + 1):
-            for i in range(dim):
-                xyz_grid[j, i] = grid[j]
+        xyz_grid = grid.view(-1, 1).expand(-1, dim).clone()
     elif grid_type == 'random':
         xyz_grid = torch.rand(100000, dim)
     else:
@@ -65,7 +57,7 @@ def precompute_grid(dim, grid_type='diagonal', bound=(0.0, 1.0)):
     return xyz_grid
 
 
-def plot_pde_results(pde: EllipticPDE, net: torch.nn.Module, writer=None, epoch=None):
+def plot_pde_results(pde: EllipticPDE, net: torch.nn.Module, writer=None, epoch=None, padding=0.5):
     # ---------------------------------------------------------
     # 定义网格范围
     x = np.linspace(pde.bound[0], pde.bound[1], 100)
@@ -74,7 +66,7 @@ def plot_pde_results(pde: EllipticPDE, net: torch.nn.Module, writer=None, epoch=
 
     xyz_plot = torch.tensor(np.vstack([X.ravel(), Y.ravel()]).T, dtype=torch.float32).to(next(net.parameters()).device)
     if pde.dim >= 2:
-        xyz_plot = F.pad(xyz_plot, (0, pde.dim - 2), "constant", 0.5)
+        xyz_plot = F.pad(xyz_plot, (0, pde.dim - 2), "constant", padding)
 
     net.eval()
     with torch.no_grad():
@@ -89,9 +81,9 @@ def plot_pde_results(pde: EllipticPDE, net: torch.nn.Module, writer=None, epoch=
 
     Res = pde.res(net, xyz_plot).cpu().numpy()
     # ---------------------------------------------------------
-    # 创建一个包含3个子图的画布
+    # 创建一个包含4个子图的画布
     # --- 图1: 精确解 ---
-    fig, axes = plt.subplots(1, 4, figsize=(20, 5), constrained_layout=True)
+    fig, axes = plt.subplots(1, 4, figsize=(22, 5), constrained_layout=True)
     im1 = axes[0].pcolormesh(X, Y, u_exact, cmap='viridis', shading='auto')
     axes[0].set_title('Exact Solution ($u_{exact}$)', fontsize=15)
     axes[0].set_xlabel('$x$')
@@ -129,4 +121,28 @@ def plot_pde_results(pde: EllipticPDE, net: torch.nn.Module, writer=None, epoch=
 
     if writer is not None and epoch is not None:
         writer.add_figure('Solution/NN Solution', fig, epoch)
+    plt.close(fig)
+
+    # ---------------------------------------------------------
+    # 对角线对比图
+    k = np.sqrt(pde.dim)
+    xyz_diag = torch.linspace(pde.bound[0], pde.bound[1], 100).view(-1, 1).expand(-1, pde.dim).clone()
+    with torch.no_grad():
+        xyz_diag = xyz_diag.to(next(net.parameters()).device)
+        u_nn = net(xyz_diag).detach().cpu().numpy()
+        u_exact = pde.u_exact(xyz_diag).cpu().numpy()
+
+    x_axis = k * xyz_diag[:, 0].cpu().numpy()
+
+    # 2. 绘制图像
+    fig = plt.figure(figsize=(8, 5))
+    plt.plot(x_axis, u_exact, 'k--', label='Exact')
+    plt.plot(x_axis, u_nn, 'r-', alpha=0.7, label='NN')
+    plt.title(f'Epoch {epoch}: Diagonal Comparison')
+    plt.xlabel('Coordinate')
+    plt.ylabel('u')
+    plt.legend()
+    plt.grid(True)
+    if writer is not None and epoch is not None:
+        writer.add_figure('Solution/Diagonal_Plot', fig, epoch)
     plt.close(fig)

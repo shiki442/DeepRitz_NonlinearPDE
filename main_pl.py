@@ -1,14 +1,17 @@
-import glob
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
 # 引入你的配置加载器 (假设你有 hydra 或类似配置)
-from config.eq3 import get_config
+from config.eq2 import get_config
 from DeepRitz.data_pl import DeepRitzDataModule
 from DeepRitz.model_pl import DeepRitzSystem
 from DeepRitz.utils import get_latest_checkpoint
 
+# import torch
+
+# # 建议在 Lightning 训练开始前设置
+# torch.set_float32_matmul_precision('high')
 
 def main(cfg):
     # 1. 设置随机种子
@@ -43,6 +46,7 @@ def main(cfg):
         callbacks=[checkpoint_callback],
         log_every_n_steps=1,  # 因为 data steps 很少，建议设为 1
         enable_progress_bar=True,
+        # accumulate_grad_batches=5,  # 如果显存不足，可以开启梯度累积
     )
 
     # 7. 自动查找断点路径

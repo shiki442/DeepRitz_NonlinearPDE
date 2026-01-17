@@ -1,6 +1,5 @@
 from matplotlib.pyplot import step
 from DeepRitz.model import Model
-from DeepRitz.matplot import Result
 from DeepRitz.nn import SolutionNet
 from config.eq1 import get_config
 import torch

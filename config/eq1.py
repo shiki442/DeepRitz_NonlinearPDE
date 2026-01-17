@@ -9,15 +9,17 @@ def get_config():
     cfg.model.dim = 2
     cfg.model.batch_in = 500000
     cfg.model.batch_bd = 200000
-    cfg.model.nonli_func = 'Sigmoid'
-    cfg.model.sol_func = 'func1'  # 'func1' or 'func2'
+    cfg.model.nonli_func = 'exp'
+    cfg.model.sol_func = 'onepeak'
     cfg.model.lambda_1 = 2000
     cfg.model.bound = [0.0, 1.0]
+    cfg.model.beta = [1.0, 1.0]
 
     cfg.training = ConfigDict()
     cfg.training.n_epochs = 100000
     cfg.training.lr = 0.002
-    cfg.training.gamma = 0.9
+    cfg.training.patience = 50
+    cfg.training.gamma = 0.5
 
     cfg.net = ConfigDict()
     cfg.net.depth = 2
@@ -37,4 +39,5 @@ def get_config():
     cfg.data.ckpt_dir = './checkpoints/eq1/'
     cfg.data.log_dir = './logs/eq1/'
     cfg.data.n_steps = 10
+    cfg.data.padding = 0.5
     return cfg

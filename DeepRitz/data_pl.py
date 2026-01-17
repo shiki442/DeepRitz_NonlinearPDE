@@ -29,7 +29,7 @@ def generate_offline_dataset(cfg, filename='pde_dataset.pt'):
         all_xyz_bd[:, i, i] = bound[1]
         # 第 i 维的下界 -> 对应第 i+dim 个面
         all_xyz_bd[:, i + dim, i] = bound[0]
-        
+
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     torch.save(
         {'xyz_in': all_xyz_in, 'xyz_bd': all_xyz_bd, 'batch_in': cfg.model.batch_in, 'batch_bd': cfg.model.batch_bd, 'dim': dim}, filename
@@ -41,7 +41,7 @@ class DeepRitzDataModule(pl.LightningDataModule):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-    
+
     def prepare_data(self):
         """
         只在主进程执行：检查并生成数据文件
@@ -58,7 +58,7 @@ class DeepRitzDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         # 原代码 batch_size=1, 因为 Dataset 内部已经切分好了 batch
-        return DataLoader(self.dataset, batch_size=1, shuffle=False, num_workers=0)
+        return DataLoader(self.dataset, batch_size=1, shuffle=False, num_workers=4, persistent_workers=True)
 
 
 class DRMDataset(Dataset):
@@ -100,12 +100,13 @@ class DRMDataset(Dataset):
         return batch_xyz_in, batch_xyz_bd
 
 
-def get_dataloader(cfg):
-    if not os.path.exists(cfg.data.file_path):
-        generate_offline_dataset(cfg, filename=cfg.data.file_path)
-    dataset = DRMDataset(cfg)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
-    return dataloader
+# def get_dataloader(cfg):
+#     if not os.path.exists(cfg.data.file_path):
+#         generate_offline_dataset(cfg, filename=cfg.data.file_path)
+#     dataset = DRMDataset(cfg)
+#     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+#     return dataloader
+
 
 def get_sobol_points(n_samples, dim):
     # PyTorch 自带 Sobol 引擎

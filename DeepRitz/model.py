@@ -7,7 +7,6 @@ import scipy.io as sio
 import torch
 from torch import nn, optim
 
-from DeepRitz.matplot import Result
 from DeepRitz.loss import VarLoss
 from DeepRitz.nn import SolutionNet
 from DeepRitz.problem import EllipticPDE
