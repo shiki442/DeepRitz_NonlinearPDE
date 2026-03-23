@@ -15,7 +15,7 @@ echo Directory is $PWD
 echo This job runs on the following nodes: $SLURM_JOB_NODELIST
 echo This job has allocated $SLURM_JOB_CPUS_PER_NODE cpu cores.
 
-echo Problem: eq2 tuning
+echo Problem: eq4 tuning
 echo Time is `date`
 echo ---------------------------------------------
 

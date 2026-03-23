@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
-#SBATCH -J TikPINN
+#SBATCH -J eq5
 #SBATCH -o job-%j.out
 #SBATCH -e job-%j.err
 #SBATCH -p gpu
@@ -15,7 +15,7 @@ echo Directory is $PWD
 echo This job runs on the following nodes: $SLURM_JOB_NODELIST
 echo This job has allocated $SLURM_JOB_CPUS_PER_NODE cpu cores.
 
-echo Problem: one-peak
+echo Problem: eq5
 echo Time is `date`
 echo ---------------------------------------------
 

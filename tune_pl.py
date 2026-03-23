@@ -5,9 +5,10 @@ import os
 import torch
 
 # 引入你现有的模块
-from config.eq2 import get_config 
+from config.eq5 import get_config
 from DeepRitz.data_pl import DeepRitzDataModule
 from DeepRitz.model_pl import DeepRitzSystem
+
 
 def objective(trial: optuna.trial.Trial):
     # 1. 获取基础配置
@@ -16,18 +17,18 @@ def objective(trial: optuna.trial.Trial):
     # -----------------------------------------------------------
     # 2. 定义搜索空间 (在这里修改你想调的参数)
     # -----------------------------------------------------------
-    
+
     # 学习率: 建议使用对数刻度
-    cfg.training.lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
-    
+    cfg.training.lr = trial.suggest_float("lr", 2e-4, 2e-3, log=True)
+
     # 网络架构
-    cfg.net.width = trial.suggest_int("width", 30, 150, step=10)
+    cfg.net.width = trial.suggest_int("width", 40, 150, step=10)
     cfg.net.depth = trial.suggest_int("depth", 2, 6)
     cfg.net.act = trial.suggest_categorical("activation", ["Tanh", "ReLU6p"])
 
     # 惩罚项系数 (lambda_1): DeepRitz 中边界惩罚非常关键
     if hasattr(cfg.model, 'lambda_1'):
-        cfg.model.lambda_1 = trial.suggest_float("lambda_1", 500, 5000, log=True)
+        cfg.model.lambda_1 = trial.suggest_float("lambda_1", 2000, 5000, step=500)
 
     if hasattr(cfg.training, 'patience'):
         cfg.training.patience = trial.suggest_categorical("patience", [50, 1000])
@@ -37,7 +38,7 @@ def objective(trial: optuna.trial.Trial):
     # -----------------------------------------------------------
     # 3. 实例化模型与数据
     # -----------------------------------------------------------
-    pl.seed_everything(134) # 保持种子一致以确保比较公平，或者去掉以引入随机性
+    pl.seed_everything(134)  # 保持种子一致以确保比较公平，或者去掉以引入随机性
 
     print(f"\n[Trial {trial.number}] 开始训练 | 参数: {trial.params}")
     data_module = DeepRitzDataModule(cfg)
@@ -46,24 +47,24 @@ def objective(trial: optuna.trial.Trial):
     # -----------------------------------------------------------
     # 4. 配置 Trainer 与 剪枝 (Pruning)
     # -----------------------------------------------------------
-    
+
     # 定义 logger，为了避免产生海量日志文件夹，可以设为 False 或者指定临时目录
     # 这里我们设为 False，只通过 Optuna 追踪
-    logger = False 
+    logger = False
 
     # 使用 Optuna 的回调，监控 'val_error'
     # 如果训练初期的 val_error 下降太慢，Optuna 会抛出 TrialPruned 异常中止训练
     pruning_callback = PyTorchLightningPruningCallback(trial, monitor="val_error")
 
     trainer = pl.Trainer(
-        max_epochs=cfg.training.n_epochs, # 或者为了搜索速度，设一个小一点的值
+        max_epochs=cfg.training.n_epochs,  # 或者为了搜索速度，设一个小一点的值
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
         devices=1,
         logger=logger,
-        enable_checkpointing=False, # 搜索时不保存大量权重文件
+        enable_checkpointing=False,  # 搜索时不保存大量权重文件
         callbacks=[pruning_callback],
         enable_progress_bar=False,  # 关闭进度条以减少控制台输出
-        log_every_n_steps=10
+        log_every_n_steps=10,
     )
 
     # -----------------------------------------------------------
@@ -81,22 +82,23 @@ def objective(trial: optuna.trial.Trial):
     # -----------------------------------------------------------
     # 从 callback_metrics 中获取最后一次 logged 的 val_error
     val_error = trainer.callback_metrics.get("val_error")
-    
+
     if val_error is None:
         return float('inf')
-        
+
     return val_error.item()
+
 
 if __name__ == "__main__":
     # 创建 Study 对象
     study = optuna.create_study(
-        study_name="deepritz_eq2",         # 给任务起个名
-        storage="sqlite:///db.sqlite3",      # 必须指定 storage
-        load_if_exists=True,                 # 支持断点续传
-        direction="minimize",                # 最小化 error
-        pruner=optuna.pruners.MedianPruner() # 自动剪枝策略
+        study_name="deepritz_eq5_v3",  # 给任务起个名
+        storage="sqlite:///dbeq5.sqlite",  # 必须指定 storage
+        load_if_exists=True,  # 支持断点续传
+        direction="minimize",  # 最小化 error
+        pruner=optuna.pruners.MedianPruner(),  # 自动剪枝策略
     )
-    
+
     print("开始 Optuna 超参数搜索...")
     # n_trials 设置尝试的次数
     study.optimize(objective, n_trials=50, timeout=None)

@@ -23,21 +23,14 @@ class EllipticPDE:
             ui = 4 * torch.mul(xyz, 1 - xyz)
             u_exact = torch.prod(ui, dim=1, keepdim=True)
         elif self.sol.lower() == "twopeak":
-            # u(x) = sin(pi*x1)+Π4xi(1-xi) %(2-d)
-            u_2tod = 4 * torch.mul(xyz[:, 1:], 1 - xyz[:, 1:])
-            u_exact = torch.sin(2 * math.pi * xyz[:, 0:1]) * torch.prod(u_2tod, dim=1, keepdim=True)
+            # u(x) = sin(pi*x1)*Π4xi(1-xi) %(i=2-d)
+            u1 = torch.sin(2 * math.pi * xyz[:, 0:1])
+            u_2_d = 4 * torch.mul(xyz[:, 1:], 1 - xyz[:, 1:])
+            u_exact = u1 * torch.prod(u_2_d, dim=1, keepdim=True)
         elif self.sol.lower() == "nondiff":
-            # # u_raw = \bar{x}^2
-            # u_raw = torch.square(torch.mean(xyz, dim=1, keepdim=True))
-            # mask_flat = u_raw < 1.0 / 6.0
-            # mask_quad = u_raw >= 1.0 / 6.0
-            # u_exact = torch.zeros_like(u_raw)
-            # u_exact[mask_quad] = u_raw[mask_quad]
-            # u_exact[mask_flat] = 1.0 / 6.0
-
             u_exact = 0.5 - torch.sum(torch.square(xyz), dim=1, keepdim=True)
-            mask_flat = u_exact > 1./3
-            u_exact[mask_flat] = 1./3
+            mask_flat = u_exact > 1.0 / 3
+            u_exact[mask_flat] = 1.0 / 3
         elif self.sol.lower() == "liouville":
             # u(x,y) = -2log(1+r^2), r = sqrt(x^2 + y^2)
             r2 = torch.sum(torch.square(xyz), dim=1, keepdim=True)
@@ -67,6 +60,9 @@ class EllipticPDE:
         elif self.nonli.lower() == "poly":
             u = self.u_exact(xyz)
             V = self.beta[0] * torch.pow(u, self.beta[1])
+        elif self.nonli.lower() == "inverse":
+            u = self.u_exact(xyz)
+            V = 1.0 / (1.0 + torch.square(u))
         else:
             V = torch.zeros_like(u)
         return V
@@ -80,6 +76,8 @@ class EllipticPDE:
             Vu = self.beta[0] * torch.exp(u)
         elif self.nonli.lower() == "poly":
             Vu = self.beta[0] * torch.pow(u, self.beta[1])
+        elif self.nonli.lower() == "inverse":
+            Vu = 1.0 / (1.0 + torch.square(u))
         else:
             Vu = torch.zeros_like(u)
         return Vu
@@ -96,6 +94,9 @@ class EllipticPDE:
             u = torch.abs(u)
             # s = torch.sgn(u)
             Fu = (self.beta[0] / (self.beta[1] + 1)) * torch.pow(u, self.beta[1] + 1)
+        elif self.nonli.lower() == "inverse":
+            # F(u) = ∫ 1/(1+s^2) ds = arctan(u)
+            Fu = torch.atan(u)
         else:
             Fu = torch.zeros_like(u)
         return Fu
@@ -114,21 +115,19 @@ class EllipticPDE:
                         D2u[:, i] *= ui[:, j]
             return -8 * torch.sum(D2u, dim=1, keepdim=True)
         elif self.sol.lower() == "twopeak":
-            D2u = torch.ones_like(xyz)
-            u_2tod = 4 * torch.mul(xyz[:, 1:], 1 - xyz[:, 1:])
-            for i in range(1, dim):
-                for j in range(1, dim):
-                    if j != i:
-                        D2u[:, i] *= u_2tod[:, j - 1]
-            laplace_2tod = -8 * torch.sum(D2u[:, 1:], dim=1, keepdim=True)
-            laplace_x1 = -4 * math.pi**2 * torch.sin(2 * math.pi * xyz[:, 0:1]) * torch.prod(u_2tod, dim=1, keepdim=True)
-            return laplace_x1 + laplace_2tod
+            u_exact = self.u_exact(xyz)
+            laplace_1 = -((2 * math.pi) ** 2) * u_exact
+            xi = xyz[:, 1:]
+            second_deriv_multipliers = -8 / (4 * xi * (1 - xi) + 1e-12)
+            laplace_2_d = torch.sum(u_exact * second_deriv_multipliers, dim=1, keepdim=True)
+            D2u = laplace_1 + laplace_2_d
+            return D2u
         elif self.sol.lower() == "nondiff":
             u_raw = 0.5 - torch.square(torch.mean(xyz, dim=1, keepdim=True))
             # D2u = torch.zeros_like(u_raw)
             # D2u[u_raw >= 1.0 / 6.0] = 2.0 / dim  # 仅在二次区域有值
             D2u = -2.0 * torch.ones_like(u_raw) * dim
-            D2u[u_raw > 1./3] = 0.0
+            D2u[u_raw > 1.0 / 3] = 0.0
             return D2u
         elif self.sol.lower() == "liouville":
             r2 = torch.sum(torch.square(xyz), dim=1, keepdim=True)
