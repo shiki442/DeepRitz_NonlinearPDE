@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # TensorBoard 日志路径
-log_dir = "./logs/eq3/lightning_logs/version_0"
+log_dir = "./logs/eq4/lightning_logs/version_0"
 
 # 创建事件累加器
 ea = event_accumulator.EventAccumulator(
@@ -64,7 +64,7 @@ plt.legend()
 plt.grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig("./logs/eq3/loss_error_plot.png", dpi=150)
+plt.savefig("./logs/eq4/loss_error_plot.png", dpi=150)
 print("\n已保存: loss_error_plot.png")
 
 # -----------------------------------------------------------
@@ -73,7 +73,7 @@ print("\n已保存: loss_error_plot.png")
 import csv
 
 # 导出 loss 数据
-with open("./logs/eq3/loss_data.csv", "w", newline="") as f:
+with open("./logs/eq4/loss_data.csv", "w", newline="") as f:
     writer = csv.writer(f)
     writer.writerow(["step", "loss_total", "loss_in", "loss_bd", "val_error", "residual"])
 
@@ -119,14 +119,14 @@ if image_tags:
             import io
 
             img = Image.open(io.BytesIO(img_data))
-            img.save(f"./logs/eq3/{tag.replace('/', '_')}_last.png")
+            img.save(f"./logs/eq4/{tag.replace('/', '_')}_last.png")
             print(f"已保存图像：{tag}_last.png")
 
             # 也保存第一张图像用于对比
             if len(events) > 1:
                 first_event = events[0]
                 img_first = Image.open(io.BytesIO(first_event.encoded_image_string))
-                img_first.save(f"./logs/eq3/{tag.replace('/', '_')}_first.png")
+                img_first.save(f"./logs/eq4/{tag.replace('/', '_')}_first.png")
                 print(f"已保存初始图像：{tag}_first.png")
 
 # -----------------------------------------------------------

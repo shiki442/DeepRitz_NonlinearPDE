@@ -16,21 +16,21 @@ def get_config():
     cfg.model.beta = [-1.0, (cfg.model.dim+2.0)  / (cfg.model.dim-2.0)]  # beta[1]=(d+2)/(d-2)
 
     cfg.training = ConfigDict()
-    cfg.training.n_epochs = 5000
-    cfg.training.lr = 0.0005
-    cfg.training.patience = 1000
+    cfg.training.n_epochs = 10000
+    cfg.training.lr = 0.0019188139562369697
+    cfg.training.patience = 50
     cfg.training.gamma = 0.5
     cfg.training.betas = (0.9, 0.99)
 
     cfg.net = ConfigDict()
-    cfg.net.depth = 5
-    cfg.net.width = 50
+    cfg.net.depth = 2
+    cfg.net.width = 70
     cfg.net.act = "Tanh"
 
     cfg.verbose = ConfigDict()
     cfg.verbose.train_info = True
     cfg.verbose.print_interval = 1
-    cfg.verbose.plot_interval = 100
+    cfg.verbose.plot_interval = 500
     cfg.verbose.ckpt_interval = 100
 
     cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'

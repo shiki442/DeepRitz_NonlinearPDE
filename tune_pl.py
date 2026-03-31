@@ -5,7 +5,7 @@ import os
 import torch
 
 # 引入你现有的模块
-from config.eq5 import get_config
+from config.eq4 import get_config
 from DeepRitz.data_pl import DeepRitzDataModule
 from DeepRitz.model_pl import DeepRitzSystem
 
@@ -22,13 +22,13 @@ def objective(trial: optuna.trial.Trial):
     cfg.training.lr = trial.suggest_float("lr", 2e-4, 2e-3, log=True)
 
     # 网络架构
-    cfg.net.width = trial.suggest_int("width", 40, 150, step=10)
-    cfg.net.depth = trial.suggest_int("depth", 2, 6)
-    cfg.net.act = trial.suggest_categorical("activation", ["Tanh", "ReLU6p"])
+    cfg.net.width = trial.suggest_int("width", 60, 140, step=10)
+    cfg.net.depth = trial.suggest_int("depth", 2, 5)
+    # cfg.net.act = trial.suggest_categorical("activation", ["Tanh", "ReLU6p"])
 
     # 惩罚项系数 (lambda_1): DeepRitz 中边界惩罚非常关键
     if hasattr(cfg.model, 'lambda_1'):
-        cfg.model.lambda_1 = trial.suggest_float("lambda_1", 2000, 5000, step=500)
+        cfg.model.lambda_1 = trial.suggest_float("lambda_1", 3000, 5000, step=500)
 
     if hasattr(cfg.training, 'patience'):
         cfg.training.patience = trial.suggest_categorical("patience", [50, 1000])
@@ -92,8 +92,8 @@ def objective(trial: optuna.trial.Trial):
 if __name__ == "__main__":
     # 创建 Study 对象
     study = optuna.create_study(
-        study_name="deepritz_eq5_v3",  # 给任务起个名
-        storage="sqlite:///dbeq5.sqlite",  # 必须指定 storage
+        study_name="deepritz_eq4_v4",  # 给任务起个名
+        storage="sqlite:///dbeq4.sqlite",  # 必须指定 storage
         load_if_exists=True,  # 支持断点续传
         direction="minimize",  # 最小化 error
         pruner=optuna.pruners.MedianPruner(),  # 自动剪枝策略

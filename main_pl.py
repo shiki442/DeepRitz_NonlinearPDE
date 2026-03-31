@@ -3,7 +3,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
 # 引入你的配置加载器 (假设你有 hydra 或类似配置)
-from config.eq5 import get_config
+from config.eq4 import get_config
 from DeepRitz.data_pl import DeepRitzDataModule
 from DeepRitz.model_pl import DeepRitzSystem
 from DeepRitz.utils import get_latest_checkpoint

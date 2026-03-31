@@ -11,7 +11,7 @@ loss_bd = []
 val_error = []
 residual = []
 
-with open("./logs/eq3/loss_data.csv", "r") as f:
+with open("./logs/eq4/loss_data.csv", "r") as f:
     reader = csv.DictReader(f)
     for row in reader:
         steps.append(int(row["step"]))
@@ -21,7 +21,7 @@ with open("./logs/eq3/loss_data.csv", "r") as f:
         val_error.append(float(row["val_error"]) if row["val_error"] else np.nan)
         residual.append(float(row["residual"]) if row["residual"] else np.nan)
 
-MAX_STEP = 100000
+MAX_STEP = 20000
 
 # 转换为 numpy 数组
 steps = np.array(steps[:MAX_STEP])
@@ -46,8 +46,8 @@ val_epochs = np.arange(1, len(val_error_valid) + 1)  # 1, 2, 3, ..., N_EPOCHS
 epochs_full = steps / N_STEPS_PER_EPOCH
 
 # 平滑窗口大小（以数据点为单位）
-LOSS_SMOOTH_WINDOW = 120  # loss 平滑窗口（500 个 step = 50 个 epoch）
-VAL_SMOOTH_WINDOW = 20   # val_error 平滑窗口（50 个 epoch）
+LOSS_SMOOTH_WINDOW = 60  # loss 平滑窗口（500 个 step = 50 个 epoch）
+VAL_SMOOTH_WINDOW = 10   # val_error 平滑窗口（50 个 epoch）
 
 # 对 loss 进行平滑处理
 loss_total_smooth = uniform_filter1d(loss_total, size=LOSS_SMOOTH_WINDOW, mode='nearest')
@@ -95,14 +95,14 @@ min_idx = np.argmin(val_error_smooth)
 ax2.annotate(
     f"Min: {val_error_smooth[min_idx]:.2e}\nEpoch: {min_idx + 1}",
     xy=(min_idx + 1, val_error_smooth[min_idx]),
-    xytext=(min_idx + 1 - 2000, val_error_smooth[min_idx] * 3),
+    xytext=(min_idx + 1, val_error_smooth[min_idx] * 3),
     fontsize=9,
     arrowprops=dict(arrowstyle="->", color="black", alpha=0.6)
 )
 
 # plt.tight_layout()
-plt.savefig("./logs/eq3/loss_val_error_curves.png", dpi=150, bbox_inches="tight")
-print(f"已保存图表：./logs/eq3/loss_val_error_curves.png")
+plt.savefig("./logs/eq4/loss_val_error_curves.png", dpi=150, bbox_inches="tight")
+print(f"已保存图表：./logs/eq4/loss_val_error_curves.png")
 
 # 打印统计信息
 print("\n" + "=" * 60)

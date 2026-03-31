@@ -238,10 +238,10 @@ def main():
     # 默认使用每个方程的 last.ckpt 或最好的 checkpoint
 
     checkpoint_configs = [
-        ('checkpoints/eq1/model-epoch=2399-val_error=5.44e-03.ckpt', 'config.eq1', 'eq1_twopeak'),
-        ('checkpoints/eq2/model-epoch=399-val_error=5.96e-03.ckpt', 'config.eq2', 'eq2_nondiff'),
-        ('checkpoints/eq3/model-epoch=11699-val_error=3.05e-04.ckpt', 'config.eq3', 'eq3_liouville'),
-        # ('checkpoints/eq4/model-epoch=499-val_error=6.54e-02.ckpt', 'config.eq4', 'eq4_yamabe'),
+        # ('checkpoints/eq1/model-epoch=2399-val_error=5.44e-03.ckpt', 'config.eq1', 'eq1_twopeak'),
+        # ('checkpoints/eq2/model-epoch=399-val_error=5.96e-03.ckpt', 'config.eq2', 'eq2_nondiff'),
+        # ('checkpoints/eq3/model-epoch=11699-val_error=3.05e-04.ckpt', 'config.eq3', 'eq3_liouville'),
+        ('checkpoints/eq4/model-epoch=1899-val_error=8.02e-03.ckpt', 'config.eq4', 'eq4_yamabe'),
     ]
 
     # 创建输出目录
